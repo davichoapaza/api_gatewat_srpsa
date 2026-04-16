@@ -2,6 +2,7 @@ package bo.gob.dgac.proxy;
 
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -14,50 +15,40 @@ import reactor.core.publisher.Mono;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import java.net.URI;
 
-
-
+/**
+ * @author David APAZA
+ * @version 1.0
+ * Encargado de realizar la gestion de sesiones, 
+ * Obtiene el perfil del usuario logeado y logout
+ * 
+ */
 @RestController
 @RequestMapping("/api/proxy")
 public class InteraccionController {
-    @GetMapping("/user-info")
-    public Map<String, Object> getUserInfo(@AuthenticationPrincipal OAuth2User principal) {
-        // Retorna los datos del ciudadano que vienen de Keycloak/AGETIC
-        return principal.getAttributes();
-    }
-   
-    
-    
-/*   esto no fuciona pq esto no funciona en programacion reactiva
-    @GetMapping("/logout") // Esto completa la ruta: /api/v1/interaccion/logout
-    public void logout(HttpServletRequest request, HttpServletResponse response) throws IOException {
-         	System.out.println("DDDDDDDDDDDDDDDDDDDDDDDDD  ");
-             // 1. Invalidar la sesión en Spring Boot (borra la cookie JSESSIONID)
-             SecurityContextLogoutHandler logoutHandler = new SecurityContextLogoutHandler();
-             logoutHandler.logout(request, null, null);
+	
+	@Value("${app.frontend-url}")
+	private String frontendUrl;
 
-             // 2. Redirigir a Keycloak para el cierre de sesión global
-             String keycloakLogoutUrl = "http://192.168.25.17:8080/realms/apprpsa/protocol/openid-connect/logout"
-                                      + "?post_logout_redirect_uri=http://192.168.25.17:4200"
-                                      + "&client_id=backend-proxy-client";
-                    //  Enviar la orden de redirección al navegador
-             response.sendRedirect(keycloakLogoutUrl);
-         }
-    
-    //http://192.168.25.17:7070/api/v1/interaccion/logout
-    */
+	@Value("${app.keycloak-url}")
+	private String keycloakUrl;
+	
+    @GetMapping("/usuario-info")
+    public Mono<Map<String, Object>> getUserInfo(@AuthenticationPrincipal OAuth2User principal) {
+        // Envolvemos el resultado en un Mono para no bloquear el flujo
+        return Mono.just(principal.getAttributes());
+    }
     
      @GetMapping("/logout")
      public Mono<Void> logout(ServerWebExchange exchange) {
-        System.out.println("Ejecutando Logout Reactivo... DDDDDDDDDDDDDDDDDDDDDDDDD");
-
+        
         // 1. Invalidar la sesión en WebFlux (esto borra la cookie de sesión reactiva)
         return exchange.getSession()
             .flatMap(session -> session.invalidate()) 
             .then(Mono.defer(() -> {
                 
                 // 2. Preparar la URL de Keycloak para el cierre de sesión global
-                String keycloakLogoutUrl = "http://192.168.25.17:8080/realms/apprpsa/protocol/openid-connect/logout"
-                                         + "?post_logout_redirect_uri=http://192.168.25.17:4200"
+                String keycloakLogoutUrl = keycloakUrl+"/realms/apprpsa/protocol/openid-connect/logout"
+                                         + "?post_logout_redirect_uri="+frontendUrl
                                          + "&client_id=backend-proxy-client";
 
                 // 3. Configurar la redirección en la respuesta reactiva
@@ -69,6 +60,7 @@ public class InteraccionController {
                 return response.setComplete();
             }));
     }
+   
 }
 
 
