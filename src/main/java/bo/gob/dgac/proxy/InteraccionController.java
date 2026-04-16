@@ -34,29 +34,24 @@ public class InteraccionController {
 	
     @GetMapping("/usuario-info")
     public Mono<Map<String, Object>> getUserInfo(@AuthenticationPrincipal OAuth2User principal) {
-        // Envolvemos el resultado en un Mono para no bloquear el flujo
         return Mono.just(principal.getAttributes());
     }
     
      @GetMapping("/logout")
      public Mono<Void> logout(ServerWebExchange exchange) {
         
-        // 1. Invalidar la sesión en WebFlux (esto borra la cookie de sesión reactiva)
+
         return exchange.getSession()
             .flatMap(session -> session.invalidate()) 
             .then(Mono.defer(() -> {
                 
-                // 2. Preparar la URL de Keycloak para el cierre de sesión global
+
                 String keycloakLogoutUrl = keycloakUrl+"/realms/apprpsa/protocol/openid-connect/logout"
                                          + "?post_logout_redirect_uri="+frontendUrl
                                          + "&client_id=backend-proxy-client";
-
-                // 3. Configurar la redirección en la respuesta reactiva
                 ServerHttpResponse response = exchange.getResponse();
                 response.setStatusCode(HttpStatus.FOUND); // Código 302
                 response.getHeaders().setLocation(URI.create(keycloakLogoutUrl));
-
-                // Finalizar el procesamiento de la respuesta
                 return response.setComplete();
             }));
     }
